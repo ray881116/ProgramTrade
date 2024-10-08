@@ -169,17 +169,20 @@ def historical_kbars(connection, api, start_date, end_date,
         )
         kbars = pd.DataFrame({**kbars})
         kbars.ts = pd.to_datetime(kbars.ts)
+        k_columns = {'Close': 'close', 'High': 'high', 'Low': 'low', 'Open': 'open', 'Volume': 'volume'}
+        kbars = kbars.rename(columns=k_columns)
         kbars['code'] = code
         kbars = kbars.set_index('ts')
-        kbars = kbars.resample(interval, closed= 'right', label= 'left').agg({'Close':'last',
-                                                                              'High':'max',
-                                                                              'Low':'min',
-                                                                              'Open': 'first',
-                                                                              'Volume':'sum'})
+        kbars = kbars.resample(interval, closed= 'right', label= 'left').agg({'close':'last',
+                                                                              'high':'max',
+                                                                              'low':'min',
+                                                                              'open': 'first',
+                                                                              'volume':'sum'})
 
         kbars.dropna(inplace=True)
 
     return kbars
+
 
 #%%
 def get_MA(kbars):
