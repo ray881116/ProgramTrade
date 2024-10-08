@@ -1,0 +1,10 @@
+.DS_Store
+data.db
+shioaji.log
+work_data.db
+.vscode/settings.json
+__pycache__/FuncBase.cpython-38.pyc
+__pycache__/Functionbase.cpython-38.pyc
+logs/ca.log.20230926
+private
+.env
