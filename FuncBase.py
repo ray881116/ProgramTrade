@@ -155,6 +155,33 @@ def ticks_to_kbars(ticks, interval = '30Min'):
     return kbars
 
 #%%
+def historical_kbars(connection, api, start_date, end_date,
+                      interval = '30Min', codes = str, is_Futures = False):
+    
+    if is_Futures:
+
+        code = ''.join(char for char in codes if char.isalpha())
+
+        kbars = api.kbars(
+            contract = api.Contracts.Futures.get(code)[codes],
+            start = start_date,
+            end = end_date
+        )
+        kbars = pd.DataFrame({**kbars})
+        kbars.ts = pd.to_datetime(kbars.ts)
+        kbars['code'] = code
+        kbars = kbars.set_index('ts')
+        kbars = kbars.resample(interval, closed= 'right', label= 'left').agg({'Close':'last',
+                                                                              'High':'max',
+                                                                              'Low':'min',
+                                                                              'Open': 'first',
+                                                                              'Volume':'sum'})
+
+        kbars.dropna(inplace=True)
+
+    return kbars
+
+#%%
 def get_MA(kbars):
     import talib  
 
