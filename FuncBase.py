@@ -163,7 +163,7 @@ def historical_kbars(connection, api, start_date, end_date,
         code = ''.join(char for char in codes if char.isalpha())
 
         kbars = api.kbars(
-            contract = api.Contracts.Futures.get(code)[codes],
+            contract = api.Contracts.Futures[codes],
             start = start_date,
             end = end_date
         )
