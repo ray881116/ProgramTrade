@@ -66,8 +66,8 @@ def get_ticks(connection, api, date, codes = str, is_Futures = False):
         if (not df.empty):
             main_df = pd.concat([main_df, df], sort=False)
         
-        else:
-            print(f'Fetching missing data for {trading_date.strftime("%Y-%m-%d")}')
+        #else:
+            #print(f'Fetching missing data for {trading_date.strftime("%Y-%m-%d")}')
 
             #若資料不存在，利用永豐API獲取 
             if is_Futures: #若為期貨
