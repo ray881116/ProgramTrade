@@ -97,45 +97,94 @@ def get_ticks(connection, api, date, codes = str, is_Futures = False):
     return main_df, False
 
 #%%
-#獲取ticks資料並更新資料庫(DB)
 
-def update_ticks(connection, api, date, codes = str, is_Futures = False):
-
-    main_df = pd.DataFrame()
+def get_ticks_ad(connection, api, date, codes = str, is_Futures = False):
 
     dates = pd.to_datetime(date)
     tw_calendar = get_calendar('XTAI')
 
-    if dates.hour > 15:
-        date = dates.date()+datetime.timedelta(days=1)
-        print(date)
+    #name tickers and correct time stamp
+
+    if is_Futures:
+        
+        #若為期貨只取英文代號作為code name
+        code = ''.join(char for char in codes if char.isalpha())
+
+        if dates.hour > 15:
+            date = dates.date()+datetime.timedelta(days=1)
+        
+        else:
+            date = dates.date()
 
     else:
+        code = codes
         date = dates.date()
+        
 
-
-    df, in_db = get_ticks(connection, api, date, codes , is_Futures)
-  
-    if df is not None and not in_db:
-        main_df = pd.concat([main_df, df], sort = False, axis = 0)
-        time.sleep(1)
+    try:    
+        sql = "SELECT * FROM ticks WHERE code = '{}' and ts BETWEEN '{}' AND '{}' ".format(code,
+                                                                                 date,
+                                                                                 date+datetime.timedelta(days=1))
+        df = pd.read_sql(sql, connection, parse_dates = ['ts'], index_col=['ts'])
+    except:
+        df = pd.DataFrame()
     
+    if not df.empty:
+        return df, True
+    
+    if is_Futures: #若為期貨
+            ticks = api.ticks(
+                contract = api.Contracts.Futures.get(code)[codes],  # For futures, use the Futures contract
+                date=date.strftime('%Y-%m-%d') 
+                )
 
-    prev_trading_date = tw_calendar.sessions_window(date,-3)
-    for prev_date in prev_trading_date:
-        print('正在更新{}:{}的逐筆成交資料'.format(prev_date.strftime('%Y-%m-%d'), codes))
-        prev_df, prev_in_db = get_ticks(connection, api, prev_date, codes, is_Futures)
+    else: #若為證券
+            ticks = api.ticks(
+            contract=api.Contracts.Stocks[code],  # For stocks, use the Stocks contract
+                date=date.strftime('%Y-%m-%d')
+            )    
+    df = pd.DataFrame({**ticks})
 
-        if prev_df is not None and not prev_in_db:
-            main_df = pd.concat([main_df, prev_df], sort = False)
-            time.sleep(1)
-        
+    df.ts = pd.to_datetime(df.ts)
+    df['code'] = code
+    df = df.set_index('ts')
+
+    return df, False
+
+#%%
+#獲取ticks資料並更新資料庫(DB)
+def update_ticks(connection, api, daily_target, is_Futures = False):
+    main_df = pd.DataFrame()
+
+    tw_calendar = get_calendar('XTAI')
+
+    for date, codes in daily_target.items():
+
+        day_trading_codes = [code for code in codes ]
+
+        print('正在更新{}逐筆成交資料，總共{}檔標的，為{}'.format(date.strftime('%Y/%m/%d'), len(day_trading_codes),day_trading_codes))
+
+        for code in day_trading_codes:
+            df, in_db = get_ticks(connection, api, date, code, is_Futures)
+
+            if df is not None and in_db:
+                main_df = pd.concat([main_df, df], sort = False)
+                time.sleep(1)
+
+            prev_trading_date = tw_calendar.previous_close(date).date()
+            prev_df, prev_in_db = get_ticks(connection, api, date, code, is_Futures)
+
+            if prev_df is not None and not prev_in_db:
+                main_df = pd.concat([main_df, prev_df], sort = False)
+                time.sleep(1)
+    
     if not main_df.empty:
-        main_df = main_df.reset_index().drop_duplicates().set_index('ts')
-        main_df = main_df.sort_index()
-        main_df.to_sql('ticks', connection, if_exists='append')
-        
-    return main_df if not main_df.empty else None
+        try:
+            main_df.to_sql('ticks', connection, if_exists='append', index=False)
+            print("Data stored successfully.")
+        except Exception as e:
+            print("Failed to store data:", e)
+    return main_df
 
     
 #%%
