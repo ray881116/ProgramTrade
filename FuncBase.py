@@ -15,6 +15,7 @@ from finlab.backtest import sim
 finlab.login('qJ5mydSbDgtQLXFOf7QNTs7TOTexbhAbhgFIQ9CmXyifNbb45nxtM/RV7Kwi4T49#free')
 
 #%%
+'''
 #獲取指定日期及前三日ticks
 
 def get_ticks(connection, api, date, codes = str, is_Futures = False):
@@ -95,10 +96,10 @@ def get_ticks(connection, api, date, codes = str, is_Futures = False):
         main_df.to_sql('ticks', connection, if_exists='append')
         
     return main_df, False
-
+'''
 #%%
 
-def get_ticks_ad(connection, api, date, codes = str, is_Futures = False):
+def get_ticks(connection, api, date, codes = str, is_Futures = False):
 
     dates = pd.to_datetime(date)
     tw_calendar = get_calendar('XTAI')
@@ -186,6 +187,7 @@ def update_ticks(connection, api, daily_target, is_Futures = False):
             print("Failed to store data:", e)
     return main_df
 
+
     
 #%%
 #將ticks轉換成kbar
@@ -232,6 +234,127 @@ def historical_kbars(connection, api, start_date, end_date,
 
     return kbars
 
+#%%
+def retry_request(url, payloads, headers):
+    
+    for i in range(3):
+    
+        try:
+            return requests.get(url, params= payloads, headers=headers)
+        
+        except:
+            print('發生錯誤，請等待一分種後再嘗試')
+            time.sleep(60)
+    
+    return None
+
+#%%
+
+def get_daily_prices(date, connection):
+
+    try:
+        df = pd.read_sql("select * from daily_prices where 日期 = '{}'".format(date),
+                         connection,
+                         parse_dates= ['日期'],
+                         index_col= ['證券代號','日期'])
+    except:
+        df = pd.DataFrame()
+    
+    if not df.empty:
+        return df, True
+    #INDB TRUE
+    #先在資料庫裡抓取每日收盤價，沒有資料則利用爬蟲重新抓取
+    
+    url = 'https://www.twse.com.tw/exchangeReport/MI_INDEX'
+
+    payloads = {
+        'response': 'html',
+        'date': date.strftime('%Y%m%d'),
+        'type': 'ALLBUT0999'
+    }
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.80 Safari/537.36'
+    }
+
+    response = retry_request(url, payloads, headers)
+
+    try:
+        df = pd.read_html(response.text)[-1]
+    
+    except:
+        print('{} 找不到資料'.format(
+            date.strftime('%Y%m%d')))
+        
+        return None, False
+    #INDB False
+    df.columns = df.columns.get_level_values(2)
+    df['漲跌價差'] = df['漲跌價差'].where(df['漲跌(+/-)'] != '-', -df['漲跌價差'])
+    df.drop(['證券名稱','漲跌(+/-)'],inplace=True, axis=1)
+    df['日期'] = pd.to_datetime(date)
+    df = df.set_index(['證券代號','日期'])
+    df = df.apply(pd.to_numeric, errors = 'coerce')
+    df.drop(df[df['收盤價'].isnull()].index, inplace=True)
+    df['昨日收盤價'] = df['收盤價'] - df['漲跌價差']
+    df['股價震幅'] = (df['最高價'] - df['最低價']) / df['昨日收盤價']*100
+
+    return df, False
+
+#%%
+def update_daily_prices(start_date, end_date, connection):
+
+    tw_calendars = get_calendar("XTAI")
+
+    main_df = pd.DataFrame()
+
+    for date in pd.date_range(start_date, end_date):
+
+        if date not in tw_calendars.opens:
+            continue
+
+        df, in_db = get_daily_prices(date, connection)
+
+        if df is not None and not in_db:
+            main_df = pd.concat([main_df,df],axis = 0)
+            print('{} 每日收盤行情抓取完成，等待15秒'.format(date.strftime('%Y%m%d')))
+            time.sleep(15)
+
+
+    if not main_df.empty:
+        main_df.to_sql('daily_price', connection, if_exists='append')
+        
+        return main_df
+
+#%%
+
+def update_historical_data(start_date, end_date, daily_target, connection, api):
+
+    tw_calendar = get_calendar('XTAI')
+
+    start = pd.to_datetime(start_date)
+    end = pd.to_datetime(end_date)
+
+
+    for date in pd.date_range(start, end):
+
+        if date not in tw_calendar.opens:
+            continue
+        
+        elif (
+            date == datetime.datetime.now().date() and
+            datetime.datetime.now().hour < 15
+        ):
+            break
+
+    print('正在更新每日收盤行情...')
+
+    update_daily_prices(tw_calendar.previous_close(start).date(), end, connection)
+
+    print('正在更新逐筆交易...')
+    
+    update_ticks(connection, api, daily_targets)
+
+    print('股市資料更新完成')
 
 #%%
 def get_MA(kbars):
