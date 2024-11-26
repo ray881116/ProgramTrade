@@ -181,7 +181,8 @@ def update_ticks(connection, api, daily_target, is_Futures = False):
     
     if not main_df.empty:
         try:
-            main_df.to_sql('ticks', connection, if_exists='append', index=False)
+            main_df = main_df.reset_index().drop_duplicates().set_index('ts')
+            main_df.to_sql('ticks', connection, if_exists='append')
             print("Data stored successfully.")
         except Exception as e:
             print("Failed to store data:", e)
