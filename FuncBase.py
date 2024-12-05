@@ -240,7 +240,7 @@ def get_daily_prices(date, connection):
         
         return None, False
     #INDB False
-    df.columns = df.columns.get_level_values(2)
+    df.columns = df.columns.get_level_values(1)
     df['漲跌價差'] = df['漲跌價差'].where(df['漲跌(+/-)'] != '-', -df['漲跌價差'])
     df.drop(['證券名稱','漲跌(+/-)'],inplace=True, axis=1)
     df['日期'] =  pd.to_datetime(date).strftime('%Y-%m-%d 00:00:00')
@@ -382,3 +382,50 @@ def get_MA(kbars):
     return kbars
 
 #%%
+import pickle
+
+def get_last_trade_by_code(trade_his_var, code):
+    """
+    Retrieve the last trade for the specified code.
+    If no record exists for the code, return None.
+    """
+    trades = trade_his_var.get(code)
+
+    if isinstance(trades, dict):
+        # 如果是單筆交易，直接返回該字典
+        return trades
+
+    if isinstance(trades, list):
+        # 如果是多筆交易，返回最後一筆交易
+        return trades[-1]  # Return the last trade in the list
+    return None
+
+def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_after_add,position):
+    """
+    Update the trade record for the given code or add a new record if it doesn't exist.
+    """
+    try:
+        # Load existing trade records from the pickle file
+        with open('trade_record.pkl', 'rb') as file:
+            trade_his_var = pickle.load(file)
+    except (FileNotFoundError, EOFError):
+        # If the file is not found or empty, initialize a new dictionary
+        trade_his_var = {}
+
+    # Update or add the trade record for the given code
+    trade_his_var[code] = {
+        'Entry_time': entry_time,
+        'Entry_price': entry_price,
+        'last_price': last_price,
+        'AC': AC,
+        'EH': EH,
+        'cost_after_add': cost_after_add,
+        'Position': position
+    }
+
+    # Save the updated trade records back to the pickle file
+    with open('trade_record.pkl', 'wb') as file:
+        pickle.dump(trade_his_var, file)
+
+    print(f"Updated trade record for {code} successfully.")
+
