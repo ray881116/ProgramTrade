@@ -430,6 +430,8 @@ def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_
 
     print(f"Updated trade record for {code} successfully.")
 
+    return trade_his_var
+
 
 # %%
 def save_results(data):
