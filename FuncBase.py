@@ -395,10 +395,11 @@ def get_last_trade_by_code(trade_his_var, code):
         # 如果是單筆交易，直接返回該字典
         return trades
 
-    if isinstance(trades, list):
+    elif isinstance(trades, list):
         # 如果是多筆交易，返回最後一筆交易
         return trades[-1]  # Return the last trade in the list
-    return None
+    else:
+        return None
 
 def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_after_add,position):
     """
@@ -429,3 +430,22 @@ def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_
 
     print(f"Updated trade record for {code} successfully.")
 
+
+# %%
+def save_results(data):
+    import json
+    import ast
+
+    data_str = str(data)
+    data_dict = ast.literal_eval(data_str.replace("Timestamp(", "").replace(")", ""))
+        
+    # 將單支股票資料轉為 DataFrame
+    for stock, details in data_dict.items():
+            
+
+        df = pd.DataFrame([details])
+        df["Stock"] = stock
+
+        filename = f"{stock}.csv"
+        df.to_csv(filename, index=False, encoding="utf-8-sig")  # `utf-8-sig` 確保中文編碼正確
+        print(f"股票 {stock} 的資料已保存到 {filename}")
