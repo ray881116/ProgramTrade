@@ -401,7 +401,7 @@ def get_last_trade_by_code(trade_his_var, code):
     else:
         return None
 
-def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_after_add,position):
+def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_after_add,position, position_changes):
     """
     Update the trade record for the given code or add a new record if it doesn't exist.
     """
@@ -421,7 +421,8 @@ def update_trade_record(code, entry_time, entry_price, last_price, AC, EH, cost_
         'AC': AC,
         'EH': EH,
         'cost_after_add': cost_after_add,
-        'Position': position
+        'Position': position,
+        'Position_Change': position_changes
     }
 
     # Save the updated trade records back to the pickle file
